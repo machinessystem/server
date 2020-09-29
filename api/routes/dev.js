@@ -56,9 +56,9 @@ router.post('/', devCheck, (req, res, next) => {
             const { key } = instance;
             if (!key) return res.status(404).send('error:no-instanceId');
             let time = new Date().toISOString();
-            db.ref(`pinDefinitions/${key}`).orderByChild('pinNo').equalTo(pinNo).once('value', async(snapshot) => {
+            db.ref(`pinDefinitions/${key}`).orderByChild('pinNo').equalTo(pinNo).once('value', async (snapshot) => {
                 if (!snapshot.val()) return res.status(404).send('error:no-pin-definition-found');
-                const result = await db.ref(`readings/${key}/${pinNo}`).push({ reading: value, time: time })
+                const result = await db.ref(`instancesReadings/${key}/${pinNo}`).push({ reading: value, time: time })
                 if (result) return res.send('success:done');
                 return res.status(500).send('error:unknown');
             });
@@ -72,7 +72,7 @@ function getCPU(req, res, next, callBack) {
     if (!instance) return res.status(404).send('error:no-instance');
     const { cpuId } = req.instance.val();
     if (!cpuId) return res.status(404).send('error:no-cpuId');
-    db.ref(`cpus/${cpuId}`).once('value', (snapshot) => {
+    db.ref(`modules/${cpuId}`).once('value', (snapshot) => {
         const cpu = snapshot.val();
         if (!cpu) return res.status(404).send('error:no-cpu');
         req.cpu = cpu;
@@ -104,7 +104,7 @@ function getCommands(req, res, next, callBack) {
     if (!instance) return res.status(404).send('error:no-instance');
     const { key } = instance;
     if (!key) return res.status(404).send('error:no-instanceId');
-    db.ref(`commands/${key}`).once('value', (snapshot) => {
+    db.ref(`instancesCommands/${key}`).once('value', (snapshot) => {
         if (!snapshot.val()) return res.status(404).send('error:no-cmd-found');
         req.commands = snapshot.val();
         callBack();

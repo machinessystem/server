@@ -7,6 +7,7 @@ const readingsRoutes = require('../api/routes/readings');
 const modulesRoutes = require('../api/routes/modules');
 const aboutRoutes = require('../api/routes/meta');
 const newsRoutes = require('../api/routes/news');
+const devRoutes = require('../api/routes/dev');
 
 const error = require('../api/middlewares/error');
 
@@ -24,5 +25,6 @@ module.exports = (app) => {
     app.use('/api/modules', modulesRoutes);
     app.use('/api/news', newsRoutes);
     app.use('/api/meta', aboutRoutes);
+    app.use('/dev', devRoutes);
     app.use(error);
 };
