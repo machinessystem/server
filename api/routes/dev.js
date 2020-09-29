@@ -62,10 +62,10 @@ router.post('/', devCheck, async (req, res, next) => {
             if (!instance) return res.status(404).send('error:no-instance');
             const { key } = instance;
             if (!key) return res.status(404).send('error:no-instanceId');
-            let time = new Date().toISOString();
+            let time = Date.now();
             db.ref(`pinDefinitions/${key}`).orderByChild('pinNo').equalTo(pinNo).once('value', async (snapshot) => {
                 if (!snapshot.val()) return res.status(404).send('error:no-pin-definition-found');
-                const result = await db.ref(`instancesReadings/${key}/${pinNo}`).push({ reading: value, time: time })
+                const result = await db.ref(`instancesReadings/${key}/${pinNo}`).set({ [time]: value })
                 if (result) return res.send('success:done');
                 return res.status(500).send('error:unknown');
             });
