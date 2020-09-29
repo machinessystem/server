@@ -1,16 +1,17 @@
 const admin = require('firebase-admin');
+const _ = require('lodash');
 const db = admin.database();
 const devCheck = require('../middlewares/dev');
 const router = require('express').Router();
 
-router.post('/', devCheck, (req, res, next) => {
+router.post('/', devCheck, async (req, res, next) => {
     const { reqType } = req.body;
     if (!reqType) return res.status(404).send('error:no-req');
     switch (reqType) {
         case 'get-defs':
             let defs = '{D';
-            getCPU(req, res, next, () => {
-                getPinDefinitions(req, res, next, () => {
+            getCPU(req, res, next, async () => {
+                await getPinDefinitions(req, res, next, () => {
                     let sortedConfiguration = req.pin_configuration.sort((a, b) => a['pinNo'] - a['pinNo']);
                     sortedConfiguration.forEach(config => {
                         let result = req.definitions.find(def => def.pinNo == config.pinNo);
@@ -27,16 +28,22 @@ router.post('/', devCheck, (req, res, next) => {
 
         case 'get-cmds':
             let cmds = '{C';
-            getCPU(req, res, next, () => {
-                getPinDefinitions(req, res, next, () => {
-                    getCommands(req, res, next, () => {
+            await getCPU(req, res, next, async () => {
+                await getPinDefinitions(req, res, next, async () => {
+                    await getCommands(req, res, next, () => {
                         let sortedConfiguration = req.pin_configuration.sort((a, b) => a['pinNo'] - a['pinNo']);
                         let commands = req.commands;
                         sortedConfiguration.forEach(config => {
                             let pin = Object.keys(commands).find(pin => pin == config.pinNo);
                             if (pin) {
                                 let newCmd = 0;
-                                Object.keys(commands[pin]).forEach(cmd => newCmd = commands[pin][cmd]['val'])
+                                console.log(commands)
+                                Object.keys(commands[pin]).forEach(cmd => {
+
+                                    console.log(commands[pin][cmd])
+                                    newCmd = commands[pin][cmd] === "OFF" ? "0" : "1";
+                                    // newCmd = commands[pin][]['val']
+                                })
                                 cmds += newCmd;
                             } else cmds += '2';
                         })
@@ -67,20 +74,19 @@ router.post('/', devCheck, (req, res, next) => {
 });
 
 
-function getCPU(req, res, next, callBack) {
+async function getCPU(req, res, next, callBack) {
     const { instance } = req;
     if (!instance) return res.status(404).send('error:no-instance');
     const { cpuId } = req.instance.val();
     if (!cpuId) return res.status(404).send('error:no-cpuId');
-    db.ref(`modules/${cpuId}`).once('value', (snapshot) => {
-        const cpu = snapshot.val();
-        if (!cpu) return res.status(404).send('error:no-cpu');
-        req.cpu = cpu;
-        callBack();
-    })
+
+    const cpu = await db.ref(`modules/${cpuId}`).once('value');
+    if (!cpu.val()) return res.status(404).send('error:no-cpu');
+    req.cpu = cpu.val();
+    callBack();
 }
 
-function getPinDefinitions(req, res, next, callBack) {
+async function getPinDefinitions(req, res, next, callBack) {
     const { instance } = req;
     if (!instance) return res.status(404).send('error:no-instance');
     const { key } = instance;
@@ -91,24 +97,30 @@ function getPinDefinitions(req, res, next, callBack) {
     if (!description) return res.status(404).send('error:no-cpu-description');
     const { pin_configuration } = description;
     if (!pin_configuration) return res.status(404).send('error:no-pin-configuration');
-    req.pin_configuration = pin_configuration;
-    db.ref(`pinDefinitions/${key}`).once('value', (snapshot) => {
-        if (!snapshot.val()) return res.status(404).send('error:no-pin-definitions');
-        req.definitions = snapshot.val();
-        callBack();
-    });
+    let pins = []
+    Object.keys(pin_configuration).forEach((pin) => {
+        pins.push({ ...pin_configuration[pin], pinNo: pin, })
+    })
+    req.pin_configuration = pins;
+    const definitions = await db.ref(`pinDefinitions/${key}`).once('value');
+    if (!definitions.val()) return res.status(404).send('error:no-cmd-found');
+    let pinDefinitions = []
+    definitions.forEach(def => {
+        pinDefinitions.push({ pinNo: def.key, ...def.val() })
+    })
+    req.definitions = pinDefinitions;
+    callBack();
 }
 
-function getCommands(req, res, next, callBack) {
+async function getCommands(req, res, next, callBack) {
     const { instance } = req;
     if (!instance) return res.status(404).send('error:no-instance');
     const { key } = instance;
     if (!key) return res.status(404).send('error:no-instanceId');
-    db.ref(`instancesCommands/${key}`).once('value', (snapshot) => {
-        if (!snapshot.val()) return res.status(404).send('error:no-cmd-found');
-        req.commands = snapshot.val();
-        callBack();
-    })
+    const commands = await db.ref(`instancesCommands/${key}`).once('value');
+    if (!commands.val()) return res.status(404).send('error:no-cmd-found');
+    req.commands = commands.val();
+    callBack();
 }
 
 
